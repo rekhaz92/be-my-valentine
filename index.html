@@ -36,20 +36,19 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.25);
       position: relative;
       width: 420px;
-      height: 330px;
+      height: 360px;
     }
 
     h1 {
-      margin-bottom: 30px;
+      margin-bottom: 28px;
       color: #ff4d6d;
       font-size: 28px;
       letter-spacing: 1px;
     }
 
-    /* Button arena */
     .buttons {
       position: relative;
-      height: 180px;         /* space for NO to run */
+      height: 180px;
       width: 100%;
       display: flex;
       flex-direction: column;
@@ -81,7 +80,21 @@
       z-index: 3;
       left: 50%;
       top: 95px;
-      transform: translateX(-50%); /* centered under YES initially */
+      transform: translateX(-50%); /* centered initially */
+      transition: left 0.18s ease, top 0.18s ease; /* smooth, not blurry */
+      touch-action: none;
+    }
+
+    .shy-text {
+      margin-top: 18px;
+      font-size: 16px;
+      color: #999;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    .shy-text.visible {
+      opacity: 1;
     }
   </style>
 </head>
@@ -89,25 +102,22 @@
 <body>
   <div class="container">
 
-    <!-- LEFT GIF -->
     <img
       class="side-gif"
       src="https://tenor.com/view/bubu-dudu-sseeyall-gif-17126117470336363610.gif"
       alt="Bubu Dudu Left"
     />
 
-    <!-- CENTER CARD -->
-    <div class="card" id="card">
-      <h1>Moomoo,</h1>
-      <h1>Will you be my Valentine?</h1>
-
+    <div class="card">
+      <h1>Moomoo, Will you be my Valentine?</h1>
       <div class="buttons" id="arena">
         <button id="yesBtn">YES</button>
         <button id="noBtn">NO</button>
       </div>
+
+      <div class="shy-text" id="shyText">NO SEEMS A BIT SHY</div>
     </div>
 
-    <!-- RIGHT GIF -->
     <img
       class="side-gif"
       src="https://tenor.com/view/tkthao219-bubududu-gif-24910622.gif"
@@ -119,46 +129,44 @@
   <script>
     const noBtn = document.getElementById("noBtn");
     const arena = document.getElementById("arena");
+    const shyText = document.getElementById("shyText");
 
-    function clamp(v, min, max) {
-      return Math.max(min, Math.min(max, v));
-    }
+    let lastMove = 0;
+    const MOVE_COOLDOWN = 120; // faster than before
+    const DANGER_RADIUS = 170; // runs away sooner
 
-    function moveNoButtonAwayFrom(mouseX, mouseY) {
+    function moveNoButtonIfClose(clientX, clientY) {
+      const now = Date.now();
+      if (now - lastMove < MOVE_COOLDOWN) return;
+
       const a = arena.getBoundingClientRect();
       const b = noBtn.getBoundingClientRect();
 
-      // Mouse position relative to arena
-      const mx = mouseX - a.left;
-      const my = mouseY - a.top;
+      // mouse relative to arena
+      const mx = clientX - a.left;
+      const my = clientY - a.top;
 
-      // Current button center relative to arena
+      // button center relative to arena
       const bx = (b.left - a.left) + b.width / 2;
       const by = (b.top - a.top) + b.height / 2;
 
-      // If mouse is close, move away
-      const dx = bx - mx;
-      const dy = by - my;
-      const dist = Math.hypot(dx, dy);
+      const dist = Math.hypot(bx - mx, by - my);
+      if (dist > DANGER_RADIUS) return;
 
-      const dangerRadius = 120; // increase for more "scared" behavior
-      if (dist > dangerRadius) return;
+      lastMove = now;
+      shyText.classList.add("visible");
 
-      // Pick a new random position, but keep FULLY inside arena bounds
       const maxLeft = a.width - b.width;
       const maxTop = a.height - b.height;
 
-      // Try a few times to find a spot farther from the mouse
+      // choose a spot that tends to be away from cursor
       let bestLeft = 0, bestTop = 0, bestScore = -1;
-
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 12; i++) {
         const left = Math.random() * maxLeft;
         const top = Math.random() * maxTop;
-
         const cx = left + b.width / 2;
         const cy = top + b.height / 2;
-        const score = Math.hypot(cx - mx, cy - my); // farther = better
-
+        const score = Math.hypot(cx - mx, cy - my);
         if (score > bestScore) {
           bestScore = score;
           bestLeft = left;
@@ -166,20 +174,19 @@
         }
       }
 
-      // Place it (important: remove translateX so it doesn't shove outside bounds)
+      // remove translate so positioning is exact
       noBtn.style.transform = "none";
-      noBtn.style.left = clamp(bestLeft, 0, maxLeft) + "px";
-      noBtn.style.top = clamp(bestTop, 0, maxTop) + "px";
+      noBtn.style.left = bestLeft + "px";
+      noBtn.style.top = bestTop + "px";
     }
 
-    // Runs away when mouse moves near it (more reliable than just hover)
-    arena.addEventListener("mousemove", (e) => {
-      moveNoButtonAwayFrom(e.clientX, e.clientY);
+    // better coverage across mouse + touch/trackpad
+    arena.addEventListener("pointermove", (e) => {
+      moveNoButtonIfClose(e.clientX, e.clientY);
     });
 
-    // Also run if they directly hover it
-    noBtn.addEventListener("mouseenter", (e) => {
-      moveNoButtonAwayFrom(e.clientX, e.clientY);
+    noBtn.addEventListener("pointerenter", (e) => {
+      moveNoButtonIfClose(e.clientX, e.clientY);
     });
 
     document.getElementById("yesBtn").addEventListener("click", () => {
